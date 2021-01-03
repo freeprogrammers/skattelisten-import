@@ -1,0 +1,11 @@
+[package]
+name = "slimp"
+version = "0.1.0"
+authors = ["Simon Mikkelsen <simonbodall@runbox.com>"]
+edition = "2018"
+
+[dependencies]
+clap = "2.33.3"
+csv = "1.1.5"
+serde = { version = "1.0.118", features = ["derive"] }
+serde_json = "1.0.61"
