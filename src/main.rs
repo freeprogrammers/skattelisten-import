@@ -1,27 +1,30 @@
 use clap::clap_app;
-use csv::ReaderBuilder;
-use serde::{Deserialize, Serialize};
-use serde::ser::{SerializeSeq, Serializer};
-use std::fs::File;
-use std::io::{self, BufReader, BufWriter, Read, Write};
+use serde::{Serialize, Serializer};
+use serde::ser::SerializeSeq;
+use std::{fs::File, str::FromStr};
+use std::io::{self, BufRead, BufReader, BufWriter, Write};
 
-#[derive(Debug, Deserialize, Serialize)]
+const CVR: usize = 0;
+const COMPANY_NAME: usize = 1;
+const SE: usize = 2;
+const YEAR: usize = 3;
+const COMPANY_TYPE: usize = 5;
+const TAXABLE_INCOME: usize = 8;
+const DEFICIT: usize = 9;
+const CORPORATE_TAX: usize = 10;
+
+#[derive(Debug, Serialize)]
 struct TaxRecord {
-    #[serde(rename = "CVR-nr.")]
     cvr: u32,
-    #[serde(rename = "SE-nr.")]
     se: u32,
-    #[serde(rename = "Navn")]
     company_name: String,
-    #[serde(rename = "Selskabstype")]
     company_type: String,
-    #[serde(rename = "Indkomstår")]
     year: u16,
-    #[serde(rename = "Skattepligtig indkomst")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     taxable_income: Option<i64>,
-    #[serde(rename = "Underskud")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     deficit: Option<i64>,
-    #[serde(rename = "Selskabsskat")]
+    #[serde(skip_serializing_if = "Option::is_none")]
     corporate_tax: Option<i64>,
 }
 
@@ -31,14 +34,15 @@ fn main() {
         (@arg dst: -d --destination +takes_value)
     ).get_matches();
 
-    let mut stderr = io::stderr();
+    let stdout = io::stdout();
+    let stdin = io::stdin();
 
-    let src: Box<dyn Read> = match matches.value_of("src") {
-        Some(s) => match File::open(s) {
+    let src: Box<dyn BufRead> = match matches.value_of("src") {
+        Some(p) => match File::open(p) {
             Ok(f) => Box::new(BufReader::new(f)),
             Err(_) => todo!()
-        }
-        None => Box::new(io::stdin())
+        },
+        None => Box::new(BufReader::new(stdin.lock()))
     };
 
     let dst: Box<dyn Write> = match matches.value_of("dst") {
@@ -46,25 +50,56 @@ fn main() {
             Ok(f) => Box::new(BufWriter::new(f)),
             Err(_) => todo!()
         }
-        None => Box::new(io::stdout())
+        None => Box::new(BufWriter::new(stdout.lock()))
     };
 
-    let mut rdr = ReaderBuilder::new()
-        .double_quote(false)
-        .trim(csv::Trim::All)
-        .from_reader(src);
-
-    let mut ser = serde_json::Serializer::new(dst);
-    let mut seq = ser.serialize_seq(None).expect("Opening serialization sequence failed");
-    
-    for res in rdr.deserialize::<TaxRecord>() {
-        match res {
-            Ok(rec) => seq.serialize_element(&rec).expect("Serializing record failed"),
-            Err(e) => {
-                let _ = writeln!(stderr, "Failed to read record: {}", e.to_string());
-            }
+    fn read_field<T: FromStr>(field: Option<&&str>) -> Option<T> {
+        match field {
+            Some(s) => match s.trim().parse::<T>() {
+                Ok(v) => Some(v),
+                Err(_) => None
+            },
+            None => None
         }
     }
+    
+    let mut ser = serde_json::Serializer::new(dst);
+    let mut seq = ser.serialize_seq(None).expect("Failed to start serialization sequence");
 
-    seq.end().expect("Failed to finish serialization");
+    for line in src.lines() {
+        match line {
+            Ok(csv) => {
+                let columns: Vec<_> = csv.split(',').collect();
+
+                let rec = TaxRecord {
+                    cvr: match read_field(columns.get(CVR)) {
+                        Some(v) => v,
+                        None => continue
+                    },
+                    se: match read_field(columns.get(SE)) {
+                        Some(v) => v,
+                        None => continue
+                    },
+                    company_name: match columns.get(COMPANY_NAME) {
+                        Some(v) => String::from(*v),
+                        None => continue
+                    },
+                    company_type: match columns.get(COMPANY_TYPE) {
+                        Some(v) => String::from(*v),
+                        None => continue
+                    },
+                    year: match read_field(columns.get(YEAR)) {
+                        Some(v) => v,
+                        None => continue
+                    },
+                    taxable_income: read_field(columns.get(TAXABLE_INCOME)),
+                    deficit: read_field(columns.get(DEFICIT)),
+                    corporate_tax: read_field(columns.get(CORPORATE_TAX)),
+                };
+
+                seq.serialize_element(&rec).expect("Serializing record failed")
+            },
+            Err(_) => todo!()
+        }
+    }
 }
