@@ -45,7 +45,7 @@ fn main() {
         None => Box::new(BufReader::new(stdin.lock()))
     };
 
-    let dst: Box<dyn Write> = match matches.value_of("dst") {
+    let mut dst: Box<dyn Write> = match matches.value_of("dst") {
         Some(s) => match File::create(s) {
             Ok(f) => Box::new(BufWriter::new(f)),
             Err(_) => todo!()
@@ -53,7 +53,7 @@ fn main() {
         None => Box::new(BufWriter::new(stdout.lock()))
     };
 
-    let mut ser = serde_json::Serializer::new(dst);
+    let mut ser = serde_json::Serializer::new(Vec::new());
     let mut seq = ser.serialize_seq(None).expect("Failed to start serialization sequence");
 
     for line in src.lines() {
@@ -66,6 +66,10 @@ fn main() {
             Err(_) => todo!()
         }
     }
+
+    seq.end().expect("Failed to end serialization sequence");
+
+    dst.write_all(ser.into_inner().as_slice()).expect("Failed to write json to destination");
 }
 
 fn read_record(csv: &str) -> Option<TaxRecord> {
