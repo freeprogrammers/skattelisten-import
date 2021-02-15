@@ -1,8 +1,8 @@
 use clap::clap_app;
-use serde::{Serialize, Serializer};
-use serde::ser::SerializeSeq;
+use serde::Serialize;
+use serde_json::json;
 use std::{fs::File, str::FromStr};
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::io::{self, BufRead, BufReader};
 
 const CVR: usize = 0;
 const COMPANY_NAME: usize = 1;
@@ -31,10 +31,8 @@ struct TaxRecord {
 fn main() {
     let matches = clap_app!(slimp =>
         (@arg src: -s --source +takes_value)
-        (@arg dst: -d --destination +takes_value)
     ).get_matches();
 
-    let stdout = io::stdout();
     let stdin = io::stdin();
 
     let src: Box<dyn BufRead> = match matches.value_of("src") {
@@ -45,31 +43,33 @@ fn main() {
         None => Box::new(BufReader::new(stdin.lock()))
     };
 
-    let mut dst: Box<dyn Write> = match matches.value_of("dst") {
-        Some(s) => match File::create(s) {
-            Ok(f) => Box::new(BufWriter::new(f)),
-            Err(_) => todo!()
-        }
-        None => Box::new(BufWriter::new(stdout.lock()))
-    };
+    let client = Typesense::new("http://localhost:8108", "hopla");
 
-    let mut ser = serde_json::Serializer::new(Vec::new());
-    let mut seq = ser.serialize_seq(None).expect("Failed to start serialization sequence");
+    client.create_collection();
+
+    let mut buffer = Vec::with_capacity(200);
+    let mut count = 0;
 
     for line in src.lines() {
-        match line {
-            Ok(csv) => {
-                if let Some(rec) = read_record(&csv) {
-                    seq.serialize_element(&rec).expect("Serializing record failed")
-                };
-            },
-            Err(_) => todo!()
-        }
+        let csv = line.expect("Failed to read line from input");
+
+        if let Some(rec) = read_record(&csv) {
+            buffer.push(rec);
+
+            if buffer.len() == buffer.capacity() {
+                count += buffer.len();
+                println!("Importing {} lines, total {}", buffer.len(), count);
+                client.import(&buffer);
+                buffer.clear();
+            }
+        };
     }
 
-    seq.end().expect("Failed to end serialization sequence");
-
-    dst.write_all(ser.into_inner().as_slice()).expect("Failed to write json to destination");
+    if buffer.len() > 0 {
+        count += buffer.len();
+        println!("Importing {} lines, total {}", buffer.len(), count);
+        client.import(&buffer);
+    }
 }
 
 fn read_record(csv: &str) -> Option<TaxRecord> {
@@ -95,4 +95,62 @@ fn read_record(csv: &str) -> Option<TaxRecord> {
         deficit: read_column(columns.get(DEFICIT)),
         corporate_tax: read_column(columns.get(CORPORATE_TAX)),
     })
+}
+
+struct Typesense {
+    base_url: String,
+    api_key: String
+}
+
+impl Typesense {
+    pub fn new<T>(base_url: T, api_key: T) -> Self
+    where T: Into<String> {
+        Typesense {
+            base_url: base_url.into(),
+            api_key: api_key.into()
+        }
+    }
+
+    pub fn create_collection(&self) {
+        let body = json!({
+            "name": "records",
+            "fields": [
+                {"name": "cvr",            "type": "int32" },
+                {"name": "se",             "type": "int32" },
+                {"name": "company_name",   "type": "string"},
+                {"name": "company_type",   "type": "string"},
+                {"name": "year",           "type": "int32" },
+                {"name": "taxable_income", "type": "int64" },
+                {"name": "deficit",        "type": "int64" },
+                {"name": "corporate_tax",  "type": "int64" }
+            ],
+            "default_sorting_field": "cvr"
+        }).to_string();
+
+        self.new_req(minreq::Method::Post, "collections")
+            .with_body(body.as_bytes())
+            .send()
+            .expect("Failed to create collection");
+    }
+
+    pub fn import(&self, records: &[TaxRecord]) {
+        let mut lines = String::new();
+
+        for r in records {
+            if let Ok(json) = serde_json::to_string(&r) {
+                lines.push_str(&json);
+                lines.push('\n');
+            }
+        }
+
+        self.new_req(minreq::Method::Post, "/collections/records/documents/import?action=upsert")
+            .with_body(lines.as_bytes())
+            .send()
+            .expect("Failed to import records");
+    }
+
+    fn new_req(&self, method: minreq::Method, endpoint: &str) -> minreq::Request {
+        minreq::Request::new(method, format!("{}/{}", self.base_url, endpoint))
+            .with_header("X-TYPESENSE-API-KEY", &self.api_key)
+    }
 }

@@ -63,6 +63,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1482821306169ec4d07f6aca392a4681f66c75c9918aa49641a2595db64053cb"
 
 [[package]]
+name = "minreq"
+version = "2.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "781e56f7d29192378f0a04948b1e6aec67ce561273b2dd26ac510bbe88d7be70"
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.24"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -122,6 +128,7 @@ name = "slimp"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "minreq",
  "serde",
  "serde_json",
 ]
