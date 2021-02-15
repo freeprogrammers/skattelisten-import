@@ -29,7 +29,7 @@ struct TaxRecord {
 }
 
 fn main() {
-    let matches = clap_app!(slimp => 
+    let matches = clap_app!(slimp =>
         (@arg src: -s --source +takes_value)
         (@arg dst: -d --destination +takes_value)
     ).get_matches();
@@ -84,7 +84,7 @@ fn read_record(csv: &str) -> Option<TaxRecord> {
     }
 
     let columns: Vec<_> = csv.split(',').collect();
-    
+
     Some(TaxRecord {
         cvr: read_column(columns.get(CVR))?,
         se: read_column(columns.get(SE))?,
