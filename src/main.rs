@@ -31,6 +31,9 @@ struct TaxRecord {
 fn main() {
     let matches = clap_app!(slimp =>
         (@arg src: -s --source +takes_value)
+        (@arg url: -u --url +takes_value +required)
+        (@arg key: -k --key +takes_value +required)
+        (@arg batch: -b --batch +takes_value default_value("200"))
     ).get_matches();
 
     let stdin = io::stdin();
@@ -43,11 +46,14 @@ fn main() {
         None => Box::new(BufReader::new(stdin.lock()))
     };
 
-    let client = Typesense::new("http://localhost:8108", "hopla");
+    let client = Typesense::new(
+        matches.value_of("url").unwrap(),
+        matches.value_of("key").unwrap(),
+    );
 
     client.create_collection();
 
-    let mut buffer = Vec::with_capacity(200);
+    let mut buffer = Vec::with_capacity(matches.value_of_t("batch").unwrap());
     let mut count = 0;
 
     for line in src.lines() {
