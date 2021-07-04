@@ -1,8 +1,8 @@
 use clap::clap_app;
 use serde::Serialize;
 use serde_json::json;
-use std::{fs::File, str::FromStr};
 use std::io::{self, BufRead, BufReader};
+use std::{fs::File, str::FromStr};
 
 const CVR: usize = 0;
 const COMPANY_NAME: usize = 1;
@@ -34,16 +34,17 @@ fn main() {
         (@arg url: -u --url +takes_value +required)
         (@arg key: -k --key +takes_value +required)
         (@arg batch: -b --batch +takes_value default_value("200"))
-    ).get_matches();
+    )
+    .get_matches();
 
     let stdin = io::stdin();
 
     let src: Box<dyn BufRead> = match matches.value_of("src") {
         Some(p) => match File::open(p) {
             Ok(f) => Box::new(BufReader::new(f)),
-            Err(_) => todo!()
+            Err(_) => todo!(),
         },
-        None => Box::new(BufReader::new(stdin.lock()))
+        None => Box::new(BufReader::new(stdin.lock())),
     };
 
     let client = Typesense::new(
@@ -83,9 +84,9 @@ fn read_record(csv: &str) -> Option<TaxRecord> {
         match column {
             Some(s) => match s.trim().parse::<T>() {
                 Ok(v) => Some(v),
-                Err(_) => None
+                Err(_) => None,
             },
-            None => None
+            None => None,
         }
     }
 
@@ -105,15 +106,17 @@ fn read_record(csv: &str) -> Option<TaxRecord> {
 
 struct Typesense {
     base_url: String,
-    api_key: String
+    api_key: String,
 }
 
 impl Typesense {
     pub fn new<T>(base_url: T, api_key: T) -> Self
-    where T: Into<String> {
+    where
+        T: Into<String>,
+    {
         Typesense {
             base_url: base_url.into(),
-            api_key: api_key.into()
+            api_key: api_key.into(),
         }
     }
 
@@ -131,7 +134,8 @@ impl Typesense {
                 {"name": "corporate_tax",  "type": "int64"                }
             ],
             "default_sorting_field": "cvr"
-        }).to_string();
+        })
+        .to_string();
 
         self.new_req(minreq::Method::Post, "collections")
             .with_body(body.as_bytes())
@@ -149,10 +153,13 @@ impl Typesense {
             }
         }
 
-        self.new_req(minreq::Method::Post, "/collections/records/documents/import?action=upsert")
-            .with_body(lines.as_bytes())
-            .send()
-            .expect("Failed to import records");
+        self.new_req(
+            minreq::Method::Post,
+            "/collections/records/documents/import?action=upsert",
+        )
+        .with_body(lines.as_bytes())
+        .send()
+        .expect("Failed to import records");
     }
 
     fn new_req(&self, method: minreq::Method, endpoint: &str) -> minreq::Request {
