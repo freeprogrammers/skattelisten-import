@@ -6,7 +6,6 @@ use std::{fs::File, str::FromStr};
 
 const CVR: usize = 0;
 const COMPANY_NAME: usize = 1;
-const SE: usize = 2;
 const YEAR: usize = 3;
 const COMPANY_TYPE: usize = 5;
 const TAXABLE_INCOME: usize = 8;
@@ -16,7 +15,6 @@ const CORPORATE_TAX: usize = 10;
 #[derive(Debug, Serialize)]
 struct TaxRecord {
     cvr: u32,
-    se: u32,
     company_name: String,
     company_type: String,
     year: u16,
@@ -94,7 +92,6 @@ fn read_record(csv: &str) -> Option<TaxRecord> {
 
     Some(TaxRecord {
         cvr: read_column(columns.get(CVR))?,
-        se: read_column(columns.get(SE))?,
         company_name: read_column(columns.get(COMPANY_NAME))?,
         company_type: read_column(columns.get(COMPANY_TYPE))?,
         year: read_column(columns.get(YEAR))?,
@@ -125,7 +122,6 @@ impl Typesense {
             "name": "records",
             "fields": [
                 {"name": "cvr",            "type": "int32"                },
-                {"name": "se",             "type": "int32"                },
                 {"name": "company_name",   "type": "string"               },
                 {"name": "company_type",   "type": "string", "facet": true},
                 {"name": "year",           "type": "int32",  "facet": true},
