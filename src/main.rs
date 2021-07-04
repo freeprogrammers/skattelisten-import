@@ -121,14 +121,14 @@ impl Typesense {
         let body = json!({
             "name": "records",
             "fields": [
-                {"name": "cvr",            "type": "int32" },
-                {"name": "se",             "type": "int32" },
-                {"name": "company_name",   "type": "string"},
-                {"name": "company_type",   "type": "string"},
-                {"name": "year",           "type": "int32" },
-                {"name": "taxable_income", "type": "int64" },
-                {"name": "deficit",        "type": "int64" },
-                {"name": "corporate_tax",  "type": "int64" }
+                {"name": "cvr",            "type": "int32"                },
+                {"name": "se",             "type": "int32"                },
+                {"name": "company_name",   "type": "string"               },
+                {"name": "company_type",   "type": "string", "facet": true},
+                {"name": "year",           "type": "int32",  "facet": true},
+                {"name": "taxable_income", "type": "int64"                },
+                {"name": "deficit",        "type": "int64"                },
+                {"name": "corporate_tax",  "type": "int64"                }
             ],
             "default_sorting_field": "cvr"
         }).to_string();
