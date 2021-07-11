@@ -5,25 +5,12 @@ use std::io::{self, BufRead, BufReader};
 use std::{fs::File, str::FromStr};
 
 const CVR: usize = 0;
-const COMPANY_NAME: usize = 1;
-const YEAR: usize = 3;
-const COMPANY_TYPE: usize = 5;
-const TAXABLE_INCOME: usize = 8;
-const DEFICIT: usize = 9;
-const CORPORATE_TAX: usize = 10;
+const NAME: usize = 1;
 
 #[derive(Debug, Serialize)]
-struct TaxRecord {
+struct Company {
     cvr: u32,
-    company_name: String,
-    company_type: String,
-    year: u16,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    taxable_income: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    deficit: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    corporate_tax: Option<i64>,
+    name: String,
 }
 
 fn main() {
@@ -58,8 +45,8 @@ fn main() {
     for line in src.lines() {
         let csv = line.expect("Failed to read line from input");
 
-        if let Some(rec) = read_record(&csv) {
-            buffer.push(rec);
+        if let Some(company) = read_company(&csv) {
+            buffer.push(company);
 
             if buffer.len() == buffer.capacity() {
                 count += buffer.len();
@@ -77,7 +64,7 @@ fn main() {
     }
 }
 
-fn read_record(csv: &str) -> Option<TaxRecord> {
+fn read_company(csv: &str) -> Option<Company> {
     fn read_column<T: FromStr>(column: Option<&&str>) -> Option<T> {
         match column {
             Some(s) => match s.trim().parse::<T>() {
@@ -90,14 +77,9 @@ fn read_record(csv: &str) -> Option<TaxRecord> {
 
     let columns: Vec<_> = csv.split(',').collect();
 
-    Some(TaxRecord {
+    Some(Company {
         cvr: read_column(columns.get(CVR))?,
-        company_name: read_column(columns.get(COMPANY_NAME))?,
-        company_type: read_column(columns.get(COMPANY_TYPE))?,
-        year: read_column(columns.get(YEAR))?,
-        taxable_income: read_column(columns.get(TAXABLE_INCOME)),
-        deficit: read_column(columns.get(DEFICIT)),
-        corporate_tax: read_column(columns.get(CORPORATE_TAX)),
+        name: read_column(columns.get(NAME))?,
     })
 }
 
@@ -119,15 +101,10 @@ impl Typesense {
 
     pub fn create_collection(&self) {
         let body = json!({
-            "name": "records",
+            "name": "companies",
             "fields": [
-                {"name": "cvr",            "type": "int32"                },
-                {"name": "company_name",   "type": "string"               },
-                {"name": "company_type",   "type": "string", "facet": true},
-                {"name": "year",           "type": "int32",  "facet": true},
-                {"name": "taxable_income", "type": "int64"                },
-                {"name": "deficit",        "type": "int64"                },
-                {"name": "corporate_tax",  "type": "int64"                }
+                {"name": "cvr",  "type": "int32" },
+                {"name": "name", "type": "string"},
             ],
             "default_sorting_field": "cvr"
         })
@@ -139,10 +116,10 @@ impl Typesense {
             .expect("Failed to create collection");
     }
 
-    pub fn import(&self, records: &[TaxRecord]) {
+    pub fn import(&self, companies: &[Company]) {
         let mut lines = String::new();
 
-        for r in records {
+        for r in companies {
             if let Ok(json) = serde_json::to_string(&r) {
                 lines.push_str(&json);
                 lines.push('\n');
@@ -151,11 +128,11 @@ impl Typesense {
 
         self.new_req(
             minreq::Method::Post,
-            "/collections/records/documents/import?action=upsert",
+            "/collections/companies/documents/import?action=upsert",
         )
         .with_body(lines.as_bytes())
         .send()
-        .expect("Failed to import records");
+        .expect("Failed to import companies");
     }
 
     fn new_req(&self, method: minreq::Method, endpoint: &str) -> minreq::Request {
