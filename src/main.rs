@@ -9,7 +9,7 @@ const NAME: usize = 1;
 
 #[derive(Debug, Serialize)]
 struct Company {
-    cvr: u32,
+    cvr: String,
     name: String,
 }
 
@@ -103,10 +103,9 @@ impl Typesense {
         let body = json!({
             "name": "companies",
             "fields": [
-                {"name": "cvr",  "type": "int32" },
+                {"name": "cvr",  "type": "string" },
                 {"name": "name", "type": "string"},
             ],
-            "default_sorting_field": "cvr"
         })
         .to_string();
 
